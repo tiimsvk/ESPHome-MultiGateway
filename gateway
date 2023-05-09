@@ -1,0 +1,1482 @@
+# add connected 12V directly in header witout relay
+
+#-------------------------------------------
+# SUBTITUTIONS 
+# basic definitions and description of the device
+#-------------------------------------------
+substitutions:
+  device_name: gateway
+  friendly_name: ESP-Gateway
+  created_by: StudioTiiM 2021-2023
+  device_description: "Bluetooth Gateway on home device whit control RGBW, WW light,  elecetricty monitoring, IR in out, Relay USB, PIR and LDR"
+
+#-------------------------------------------
+# DEFINE PINS AND VARIABILES
+# CIRCUIT AND MODULES - basic definitions and description of the device
+#-------------------------------------------
+
+ # ----- MCU -----
+  # Module: ESP32_Devkitc_V4 Espressif ESP32-WROOM-32U
+   # Circuit:
+  
+ # ----- LEDS -----
+  # Modul: Status led
+   # Specification: 1x yellow led on LAN port
+   # Circuit: led -> 22Ω -> GND
+   # Power consumption: 15mA
+  status_led: GPIO02
+
+ # ----- BATTERY -----
+ # not installed ... planned external power supply connector
+  # Battery: li-Pol 3.7V x mAh
+   # Protection: BMS 1S
+   # Type battery: 
+   # Circuit: Divider 220kΩ - 470kΩ
+  # battery_adc: GPIO39
+  # battery_switch: GPIO05
+  
+ # ----- ELECTRICITY ------
+ # ----- MEASURE -----
+  # Module: INA219 High Side DC Current
+   # Specification: Dimension 25x22mm / Voltage: Operating 3 ~ 5.5V, max in 32V / Resolution: 3.2A 12bit / Accuracy: ±1% / Operational Range: Temperature: -25 ~ +85°C
+   # Shunt resistor: 100mΩ max 320mV
+    # Math: shunt_voltage / shunt_resistor = 0.32V / 0.1Ω = 3.2A know values: 0.144V / 1.44A = 0.1Ω
+    # Modification: 0.05Ω * 5A = 250mV
+    # https://forums.adafruit.com/download/file.php?id=84820&sid=d180edeb3286734d1316585c555f86ae
+   # Consumption: Standby 15μA / Normal 1mA
+    # Attention: remove the 0.1 ohm current sense resistor and replace it with their own to change the range (say a 0.01 ohm to measure up 32 Amps with a resolution of 8mA) 
+    # Note: that when switching inductive loads, the instantaneous voltage levels may greatly exceed steady-state levels due to inductive kickback. Chip damage can occur if you do not take precautions to protect against inductive spikes.
+   # Circuit: Interface: I2C address: 0x40
+ # ------ POWER SUPPLY ------
+  # Modul:  IP6536 Step-down converter whit dcp protocol
+   # Specification: Synchronous step-down converter / Built-in Power MOSFETs / Wide Input Voltage Range, 8V to 32V / Output Voltage Range, 5V /Output Current, 2.4A /Current Limit Protection / Conversion efficiency up to 92.4% / Soft-Start / Output Voltage Line Loss Compensation / Operational Range: Temperature: -40 ~ +85°C
+ 
+ # ------- PROTECT -----
+  # Module 1: mini ATC fuse 
+   # Specification: 2A 12V whit car fuse holder,
+   # Description: Full device protect whitout led strip 
+  # Module 2: smd PPTC polyswitch fuse self recovery
+   # Specification: 1.1A (no best solution recomended 0.75A 6V)
+   # Description: Protected esp and others module
+
+ # ----- ETHERNET -----
+ # Module: LAN8720 Eth Board Single-chip Ethernet Physical Layer Transciever (PHY)
+  # Chip: 8720A-i
+  # Specification: Voltage 1.6 ~ 3.6V / integrated 1.2V regulator / HP auto-MDIX support / 10/100Mbit / two status led / HanRun HR911105A lan socket RJ45 / Operational Range: Temperature: -40 ~ +85°C
+  
+  phy_adress: "1"
+  
+  lan_mdc_pin: GPIO23
+  lan_mdio_pin: GPIO18
+  lan_clk_pin: GPIO0_IN # add pull up 4.7kΩ
+  
+  # TX1:   GPIO22
+  # TX0:   GPIO19
+  # TX_EN: GPIO21
+  # RX1:   GPIO26
+  # RX0:   GPIO25
+  # CRS:   GPIO27
+
+  lan_power_pin: GPIO16
+  # Modifications:
+   # Circuit: add pullup 4.7k to clk_pin on board solder
+   # Circuit2: connected NC pin on board whit EN pin oscilloscope crystal and connected power pin whit pulldown 4.7k to GND
+   # Solution whitout power pin install supervisor
+ 
+ # ----- IR TRANSMITER / RECEIVER -----
+  # Module: 
+   # Specification: Voltage: 3 ~ 5V / Emission: Distance: 1-2m Frequency: 850nm-940nm Angle: 20°/ Modulate Frequency: 38Khz
+   # Circuit transmiter: whit level shifter tx pin connected two ir led (tested 5v 100ohm npn 2n2222 470 ohm ir led)
+   # Circuit receiver: connected 3V3 to gpio
+  ir_transmitter_pin: GPIO32
+  ir_receiver_pin: GPIO35
+
+ # ----- PORT EXPANDER ------
+  # Module: PCF85741 HW-400
+   # Specification: 8channal / Voltage 2.5 ~ 6V / max 25mA / IO logic 1mA 
+   # Power consumption: standby 2.5uA
+   # Circuit: Interface: I2C adresse 0x20
+   # Modifications: unsolder i2c pullup 1k resistor (bug i2c not found 5V required 1k pullup is ok)
+ 
+ # ----- RELAY -----
+  # Module: 2x SRD-05VDC-SL-C
+   # Specification: Voltage: 5VDC 90mA / 5pins / Range: 250VAC 10A, 30VDC 10A
+   # Circuit: protect diode SS110 GND -> VCC / NPN BC337 10kΩ pulldown and 100Ω to GPIO
+  #relay1_pin: GPIO17
+  #relay2_pin: GPIO16
+
+  # PCF8574 expander port
+  relay1_pin: "0"
+  relay2_pin: "1"
+
+ # ----- RGBW LED STRIP -----
+  # Module: RGBWW 12V 60led/m smd 5050
+   # Specification: Lenght: 12m / Voltage: 12V / IP30 / Average life: 50000h / Number: 60/m / 2700k warm white
+   # Power consumption: 12W/m 1.0A = 12m = 12A
+  green_pin: GPIO13
+  red_pin: GPIO12
+  #blue_pin: GPIO01 ok
+  blue_pin: GPIO17
+  white_pin: GPIO33
+ 
+ # ----- WW LED STRIP -----
+  # Module: Soft flexible neon rope light
+   # Specification: Lenght: 3m / Voltage: 12V / IP44 / Average life: 50000h / 2700k warm white
+   # Power consumption: 6W/m 0.5A = 3m = 1.5A
+  ww_pin: GPIO04
+ 
+ # ----- PIR -----
+  # Module: AM321 / SB312 (Dual pyroelectric infrared sensor RE200B)
+   # Specification: Voltage operating 3 ~ 10V source 0.3 ~ 1.5V signal out min. 2.5V / Operational Range: Temperature: -20 ~ +70°C
+   # Circuit: 5V / out 3V3
+
+   # Pinout: only pir sensor
+   # Back view
+   #         2 source
+   #            .
+   # 1 drain .     . 3 gate
+  pir_pin: GPIO34
+
+ # ----- LDR -----
+  # Module: Photo Light Dependent Resistors GL55XX 10K
+  # Circuit: VCC -> 10K -> GPIO -> LDR -> GND
+  ldr_pin: GPIO36 #VP
+  
+ # ----- BUTTON -----
+  # Model: push button 6x6mm; 2pin; 12mm; 90°
+  # Circuit: pullup 10k resistor
+  #button1_pin: GPIO03 #RX ok 
+
+  # PCF8574 expander port
+  button1_pin: "3" # RELAY 1
+  button2_pin: "2" # RELAY 2
+  button3_pin: "4" # LED RGBW
+  button4_pin: "5" # LED WW
+
+#-------------------------------------------
+# POWER STRIP
+#-------------------------------------------
+ # Modul: Tuya strip Lingan SWB2-1
+  # Specification:
+  # Circuit:
+
+ # ----- RELAY -----
+  # Module: 3x SRD-05VDC-SL-C
+   # Specification: Voltage: 5VDC 90mA / 5pins / Range: 250VAC 10A, 30VDC 10A
+   # Circuit: 
+    # Power relay: 5VDC(live line!) -> RELAY whit protext diode -> J3Y (pc817 + R511) -> GND (live line!)
+    # Power IO: 3V3 -> LED red -> 22Ω -> pc817 -> IO
+   # Power consumption: Each channal 64mA
+  button_strip: "0"
+  socket1: "1"
+  socket2: "2"
+  socket3: "3"
+
+ #----- POWER METER -----
+  # Module: Energy Meter HLW8012 Breakout Board single-phase multi-function metering chip
+   # Specification: Voltage 4.5 ~ 5.5V / Power consumption: < 3mA / -40 ~ 85 °C
+    # CF: high-frequency pulse for energy metering
+    # CF1:high-frequency for indicating current RMS or voltage RMS
+    # V1P/V1N: Vpeak: ±43.75mV
+    # VP2: Vpeak: ±700mV
+    # SEL: 0 current / 1 voltage
+   # Modification: remove NPN7002K and all resistor connected final pins (2x 153 3x 103 resistor)
+   # Circuit: OPTOISOLATION 
+    # SEL, CF AND CF1 PIN: GPIO -> pullup 3v3 330Ω -> pc817 opto (or similar rise and fall time < 4us) -> GND / 5V -> 470Ω -> pc817 -> pin cf/cf1 (SEL PIN reverse connection)
+  # Current measure:
+   # Higher value gives lower watt readout
+   # Current resistor: R002 = 2mΩ current ""
+  current_res: "0.0037 ohm"  #Ω Calibrate whit multimeter 
+  # Volatge measure:
+   # Lower value gives lower voltage readout
+   # (R_upstream + R_downstream) / R_downstream
+   # 5x 470kohm 1x 1kohm
+   # calibrate whit multimeter
+  voltage_div: "1414" # default on board 2351 (471.6Ω + 471.1Ω + 467.5Ω + 470Ω + 470Ω + 0.993Ω ) / 0.993Ω)
+  
+  hlw_sel_pin: "4" # change every measure voltage/current 
+  hlw_cf_pin: GPIO01 #power/energy measured
+  hlw_cf1_pin: GPIO05 #current/voltage
+
+#-------------------------------------------
+# VARIABILES
+#-------------------------------------------
+
+
+#-------------------------------------------
+# PROTOCOLS
+#-------------------------------------------
+ # ----- PROTOCOLS PINS -----
+  # I2C
+  i2c_sda: GPIO14
+  i2c_scl: GPIO15
+  # Circuit: pullup 10k
+
+ # ----- PROTOCOLS SETTINGS -----
+i2c:
+ sda: "$i2c_sda"
+ scl: "$i2c_scl"
+ scan: True
+ 
+#-------------------------------------------
+# ESP MAIN SETTINGS
+#-------------------------------------------
+esphome:
+  name: gateway
+  project:
+    name: "studiotiim.gateway"
+    version: 4.0.0
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+ baud_rate: 0 #(hw pin RX TX used)
+ # level: verbose
+# no log on hw uart
+
+api:
+  reboot_timeout: 60min
+ota:
+  password: !secret ota_pass
+
+#-------------------------------------------
+# ETHERNET
+#-------------------------------------------
+ethernet:
+  type: LAN8720
+  mdc_pin: $lan_mdc_pin
+  mdio_pin: $lan_mdio_pin
+  clk_mode: $lan_clk_pin
+  phy_addr: $phy_adress
+  power_pin: $lan_power_pin
+  
+#  manual_ip:
+#    static_ip: 192.168.31.100
+#    gateway: 192.168.31.1
+#    subnet: 255.255.255.0
+#  ap:
+#    ssid: "$friendly_name Hotspot"
+#    password: !secret api_pass
+
+#-------------------------------------------
+# PORT EXPANDER
+#-------------------------------------------
+pcf8574:
+# Gateway
+  - id: 'pcf8574_hub1'
+    address: 0x20
+    pcf8575: false
+
+# Strip
+  - id: 'pcf8574_hub2'
+    address: 0x24
+    pcf8575: false
+
+#-------------------------------------------
+# BLUETOOTH GATEWAY
+#-------------------------------------------
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 1100ms
+    window: 1100ms
+    active: True
+
+bluetooth_proxy:
+  active: true
+
+#-------------------------------------------
+# STATUS LED
+#-------------------------------------------
+status_led:
+  pin: "$status_led"
+
+#-------------------------------------------
+# SENSORS
+#-------------------------------------------
+sensor:
+#-------------------------------------------
+# Power meter sensor - hlw8012 modul
+#-------------------------------------------
+  - platform: hlw8012
+    sel_pin: 
+      pcf8574: pcf8574_hub2
+      number: "$hlw_sel_pin"
+      mode:
+        output: true
+      inverted: True
+    cf_pin: "$hlw_cf_pin"
+    cf1_pin: "$hlw_cf1_pin"
+#    initial_mode: CURRENT
+    current_resistor: "$current_res"
+    voltage_divider: "$voltage_div" #(471.6 + 471.1 + 467.5 + 470 + 470 + 0.993 ) / 0.993
+    change_mode_every: 2
+    current:
+      name: "${friendly_name} Current Strip"
+      id: current
+      accuracy_decimals: 3
+    voltage:
+      name: "${friendly_name} Voltage Strip"
+      id: voltage
+      accuracy_decimals: 0      
+    power:
+      name: "${friendly_name} Power Strip"
+      internal: true #not connected template math
+    energy:
+      name: "${friendly_name} Energy Strip"
+    update_interval: 15s
+
+  - platform: template
+    name: "${friendly_name} Power Strip"
+    accuracy_decimals: 2
+    unit_of_measurement: W
+    lambda: |-
+      return id(voltage).state * id(current).state;
+      
+#-------------------------------------------
+# LDR Photoresistor - Lux meter
+#-------------------------------------------
+  - platform: adc
+    pin: $ldr_pin
+    attenuation: 11db
+    id: ldr_adc
+    name: "Illuminance"
+    unit_of_measurement: lux
+    device_class: illuminance
+    accuracy_decimals: 0
+    update_interval: 10s
+    filters:
+      - calibrate_linear:
+          - 0.5 -> 0
+          - 2.8 -> 500
+      # No value lower than 0
+      - lambda: 'return max((float)0.0, x);'
+
+#-------------------------------------------
+# INA 219 - electricity measure
+#-------------------------------------------
+  - platform: ina219
+    address: 0x40
+    shunt_resistance: 0.1 ohm
+    current:
+      name: "${friendly_name} Current"
+      
+    power:
+      name: "${friendly_name} Power"
+      id: power
+    bus_voltage:
+      name: "${friendly_name} Voltage"
+      accuracy_decimals: 2
+    shunt_voltage:
+      name: "${friendly_name} Shunt Voltage"
+      unit_of_measurement: mV
+      filters:
+        multiply: 1000
+    max_voltage: 32.0V
+    max_current: 3.2A
+    update_interval: 10s
+
+  - platform: total_daily_energy
+    name: "Energy"
+    power_id: power
+    accuracy_decimals: 2
+
+#-------------------------------------------
+# TIME 
+#-------------------------------------------
+time:
+  - platform: sntp
+    id: esptime
+    timezone: "Europe/Bratislava"
+
+#-------------------------------------------
+# SWITCHES
+#-------------------------------------------
+switch:
+  - platform: restart
+    name: "Restart"
+    id: restart_mcu
+
+#-------------------------------------------
+# Template Button all switch strip
+#-------------------------------------------
+  - platform: template
+    name: "${friendly_name} Socket all"
+    id: socket_all_temp
+    optimistic: true
+    # restore_state: on
+    on_turn_on:
+      then:
+        - switch.turn_on: stripsocket1
+        - switch.turn_on: stripsocket2
+        - switch.turn_on: stripsocket3
+    on_turn_off:
+      then:
+        - switch.turn_off: stripsocket1
+        - switch.turn_off: stripsocket2
+        - switch.turn_off: stripsocket3
+
+#-------------------------------------------
+# Power Relay switch
+# channal 1
+#-------------------------------------------
+  - platform: gpio
+    pin:  
+      pcf8574: pcf8574_hub1
+      number: $relay1_pin
+      mode:
+        output: true
+      inverted: True
+    name: "${friendly_name} Switch 1"
+    id: switch1
+    icon: mdi:power-plug
+    restore_mode: RESTORE_DEFAULT_OFF
+
+#-------------------------------------------
+# Power Relay switch
+# channal 2
+#-------------------------------------------
+  - platform: gpio
+    pin:
+      pcf8574: pcf8574_hub1
+      number: $relay2_pin
+      mode:
+        output: true
+      inverted: True
+    name: "${friendly_name} Switch 2"
+    id: switch2
+    icon: mdi:power-plug
+    restore_mode: RESTORE_DEFAULT_OFF
+
+#-------------------------------------------
+# Strip Relay switch
+# socket 1
+#-------------------------------------------
+  - platform: gpio
+    pin:
+      pcf8574: pcf8574_hub2
+      number: $socket1
+      mode:
+        output: true
+      inverted: True
+    name: "${friendly_name} Socket 1"
+    id: stripsocket1
+    icon: mdi:power-plug
+    restore_mode: RESTORE_DEFAULT_OFF
+
+#-------------------------------------------
+# Strip Relay switch
+# socket 2
+#-------------------------------------------
+  - platform: gpio
+    pin:
+      pcf8574: pcf8574_hub2
+      number: $socket2
+      mode:
+        output: true
+      inverted: True
+    name: "${friendly_name} Socket 2"
+    id: stripsocket2
+    icon: mdi:power-plug
+    restore_mode: RESTORE_DEFAULT_OFF
+
+#-------------------------------------------
+# Strip Relay switch
+# socket 3
+#-------------------------------------------
+  - platform: gpio
+    pin:
+      pcf8574: pcf8574_hub2
+      number: $socket3
+      mode:
+        output: true
+      inverted: True
+    name: "${friendly_name} Socket 3"
+    id: stripsocket3
+    icon: mdi:power-plug
+    restore_mode: RESTORE_DEFAULT_OFF
+
+#-------------------------------------------
+# BINARY SENSORS
+#-------------------------------------------
+binary_sensor:
+#-------------------------------------------
+# Pir sensor SB312 
+#-------------------------------------------
+  - platform: gpio
+    pin: 
+      number: "$pir_pin"
+    name: "Motion"
+    id: motion
+    device_class: motion
+    filters:
+      - delayed_off: 10s
+
+#-------------------------------------------
+# Button 1
+#-------------------------------------------
+  - platform: gpio
+    name: "Button 1"
+    pin:
+      pcf8574: pcf8574_hub1
+      number: $button1_pin
+      mode:
+        input: true
+    id: button1
+    filters:
+      - invert:
+      - delayed_on: 10ms
+    on_press:
+      then:
+        switch.toggle: switch1
+    on_double_click:
+      then:
+        switch.turn_on: restart_mcu
+  
+#-------------------------------------------
+# Button 2
+#-------------------------------------------
+  - platform: gpio
+    name: "Button 2"
+    pin:
+      pcf8574: pcf8574_hub1
+      number: $button2_pin
+      mode:
+        input: true
+    id: button2
+    filters:
+      - invert:
+      - delayed_on: 10ms
+    on_press:
+      then:
+        switch.toggle: switch2
+
+#-------------------------------------------
+# Button 3
+#-------------------------------------------
+  - platform: gpio
+    name: "Button 3"
+    pin:
+      pcf8574: pcf8574_hub1
+      number: $button3_pin
+      mode:
+        input: true
+    id: button3
+    filters:
+      - invert:
+      - delayed_on: 10ms
+    on_press:
+      then:
+        light.toggle: ${device_name}
+
+#-------------------------------------------
+# Button 4
+#-------------------------------------------
+  - platform: gpio
+    name: "Button 4"
+    pin:
+      pcf8574: pcf8574_hub1
+      number: $button4_pin
+      mode:
+        input: true
+    id: button4
+    filters:
+      - invert:
+      - delayed_on: 10ms
+    on_press:
+      then:
+        light.toggle: ww_lightstrip1
+
+#-------------------------------------------
+# Button strip - on press all relay on or off
+#-------------------------------------------
+  - platform: gpio
+    name: "${friendly_name} Button"
+    pin:
+      pcf8574: pcf8574_hub2
+      number: "$button_strip"
+      mode:
+        input: true
+    id: press_strip
+    filters:
+      - invert:
+      - delayed_on: 20ms
+    device_class: power
+    on_press:
+      then: 
+        - switch.template.publish:
+            id: socket_all_temp
+            state: !lambda |-
+              if (id(socket_all_temp).state) {
+                return false;
+              } else {
+                return true;
+              }
+
+#-------------------------------------------
+# Online status 
+# Only API
+#-------------------------------------------
+  - platform: status
+    name: "${friendly_name} Status"
+    id: status_online
+    entity_category: diagnostic
+    icon: mdi:access-point-check
+
+#-------------------------------------------
+# IR REMOTE 
+# mapping codes 24 buttons
+#-------------------------------------------
+# Basic settings
+#-------------------------------------------
+  # On
+  - platform: remote_receiver
+    name: "Remote ON"
+    nec:
+      address: 0xEF00
+      command: 0xFC03
+    internal: true
+    on_press:
+      then:
+        - light.turn_on:
+            color_mode: RGB_white
+            id: ${device_name}
+            brightness: 100%
+            color_brightness: 0%
+            effect: none
+            white: 100%
+            red: 0%
+            blue: 0%
+            green: 0%
+  # Off
+  - platform: remote_receiver
+    name: "Remote OFF"
+    nec:
+      address: 0xEF00
+      command: 0xFD02
+    internal: true
+    on_press:
+      then:
+        - light.turn_off: ${device_name}
+        - light.turn_off: ww_lightstrip1
+  # brightness up
+  - platform: remote_receiver
+    name: "Remote BRIGHTUP"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xFF00
+    on_press:
+      then:
+        - light.dim_relative:
+            id: ${device_name}
+            relative_brightness: 5%
+  # brightness down
+  - platform: remote_receiver
+    name: "Remote BRIGHTDOWN"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xFE01
+    on_press:
+      then:
+        - light.dim_relative:
+            id: ${device_name}
+            relative_brightness: -5%
+
+#-------------------------------------------
+# Channal settings
+#-------------------------------------------
+  # Red channal
+  - platform: remote_receiver
+    name: "Remote RED"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xFB04
+    on_press:
+      then:
+        - light.turn_on:
+            id: ${device_name}
+            red: 100%
+            green: 0%
+            blue: 0%
+            white: 0%
+            effect: None
+  # Green channal
+  - platform: remote_receiver
+    name: "Remote GREEN"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xFA05  
+    on_press:
+      then:
+        - light.turn_on:
+            id: ${device_name}
+            red: 0%
+            green: 100%
+            blue: 0%
+            white: 0%
+            effect: None
+  # Blue channal
+  - platform: remote_receiver
+    name: "Remote BLUE"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xF906  
+    on_press:
+      then:
+        - light.turn_on:
+            id: ${device_name}
+            red: 0%
+            green: 0%
+            blue: 100%
+            white: 0%
+            effect: None
+  # White channal
+  - platform: remote_receiver
+    name: "Remote WHITE"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xF807   
+    on_press:
+      then:
+        - light.turn_on:
+            color_mode: RGB_white
+            id: ${device_name}
+            brightness: 100%
+            color_brightness: 0%
+            effect: none
+            white: 100%
+            red: 0%
+            blue: 0%
+            green: 0%
+
+#-------------------------------------------
+# Color settings
+#-------------------------------------------
+  # Fire color
+  - platform: remote_receiver
+    name: "Remote Fire color"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xF708    
+    on_press:
+      then:
+        - light.turn_on:
+            id: ${device_name}
+            red: 100%
+            green: 25%
+            blue: 0%
+            white: 0%
+            effect: None
+  # Orange color
+  - platform: remote_receiver
+    name: "Remote Orange color"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xF30C  
+    on_press:
+      then:
+        - light.turn_on:
+            id: ${device_name}
+            red: 100%
+            green: 50%
+            blue: 0%
+            white: 0%
+            effect: None
+  # Gold color
+  - platform: remote_receiver
+    name: "Remote Gold color"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xEF10
+    on_press:
+      then:
+        - light.turn_on:
+            id: ${device_name}
+            red: 100%
+            green: 75%
+            blue: 0%
+            white: 0%
+            effect: None
+  # Yellow color
+  - platform: remote_receiver
+    name: "Remote Yellow color"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xEB14
+    on_press:
+      then:
+        - light.turn_on:
+            id: ${device_name}
+            red: 100%
+            green: 100%
+            blue: 0%
+            white: 0%
+            effect: None
+  # Applegreen color
+  - platform: remote_receiver
+    name: "Remote Applegreen color"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xF609
+    on_press:
+      then:
+        - light.turn_on:
+            id: ${device_name}
+            red: 0%
+            green: 100%
+            blue: 25%
+            white: 0%
+            effect: None
+  # Aqua color
+  - platform: remote_receiver
+    name: "Remote Aqua color"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xF20D
+    on_press:
+      then:
+        - light.turn_on:
+            id: ${device_name}
+            red: 0%
+            green: 100%
+            blue: 100%
+            white: 0%
+            effect: None
+  # Turquoise color
+  - platform: remote_receiver
+    name: "Remote Turquoise color"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xEE11
+    on_press:
+      then:
+        - light.turn_on:
+            id: ${device_name}
+            red: 0%
+            green: 100%
+            blue: 75%
+            white: 0%
+            effect: None
+  # Jade color
+  - platform: remote_receiver
+    name: "Remote Jade color"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xEA15
+    on_press:
+      then:
+        - light.turn_on:
+            id: ${device_name}
+            red: 0%
+            green: 100%
+            blue: 50%
+            white: 0%
+            effect: None
+  # Azure color
+  - platform: remote_receiver
+    name: "Remote Azure color"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xF50A
+    on_press:
+      then:
+        - light.turn_on:
+            id: ${device_name}
+            red: 0%
+            green: 50%
+            blue: 100%
+            white: 0%
+            effect: None
+  # Purple color
+  - platform: remote_receiver
+    name: "Remote Purple color"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xF10E
+    on_press:
+      then:
+        - light.turn_on:
+            id: ${device_name}
+            red: 25%
+            green: 0%
+            blue: 100%
+            white: 0%
+            effect: None
+  # Ruby color
+  - platform: remote_receiver
+    name: "Remote Ruby color"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xED12
+    on_press:
+      then:
+        - light.turn_on:
+            id: ${device_name}
+            red: 50%
+            green: 0%
+            blue: 100%
+            white: 0%
+            effect: None
+  # pink color
+  - platform: remote_receiver
+    name: "Remote Pink color"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xE916
+    on_press:
+      then:
+        - light.turn_on:
+            id: ${device_name}
+            red: 100%
+            green: 0%
+            blue: 100%
+            white: 0%
+            effect: None
+
+#-------------------------------------------
+# Effect settings
+#-------------------------------------------
+  # Effect Flash
+  - platform: remote_receiver
+    name: "Remote FLASH"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xF40B
+    on_press:
+      then:
+        - light.toggle:
+            id: ww_lightstrip1
+        # used led strip WW
+        #- light.turn_on:
+        #     id: ${device_name}
+        #     effect: "Flash"
+
+  # Effect Strobe
+  - platform: remote_receiver
+    name: "Remote STROBE"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xF00F
+    on_press:
+      then:
+        - light.turn_on:
+             id: ${device_name}
+             effect: "Strobe"
+  # Effect Fade
+  - platform: remote_receiver
+    name: "Remote Fade"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xEC13
+    on_press:
+      then:
+        - light.turn_on:
+             id: ${device_name}
+             effect: "Fade"
+  # Effect Smooth
+  - platform: remote_receiver
+    name: "Remote STROBE"
+    internal: true
+    nec:
+      address: 0xEF00
+      command: 0xE817
+    on_press:
+      then:
+        - light.turn_on:
+             id: ${device_name}
+             effect: "Smooth"
+
+#-------------------------------------------
+# LIGHTS
+#-------------------------------------------
+light:
+#-------------------------------------------
+# Led -Strip white
+#-------------------------------------------
+  - platform: monochromatic
+    name: Light WW
+    id: ww_lightstrip1
+    output: white_channel_ww
+    restore_mode: ALWAYS_OFF
+
+#-------------------------------------------
+# Led -Strip RGBWW
+#-------------------------------------------
+  - platform: rgbw
+    name: Light RGBWW
+    id: ${device_name}
+    red: red_channel
+    green: green_channel
+    blue: blue_channel
+    white: white_channel
+    #color_interlock: true
+    effects:
+      # Flash effect
+      - strobe:
+          name: Flash
+      # Strobe effect
+      - strobe:
+          name: Strobe
+          colors:
+            - state: True
+              brightness: 100%
+              white: 0%
+              red: 100%
+              blue: 0%
+              green: 0%
+              duration: 150ms
+            - state: False
+              duration: 100ms
+
+            - state: True
+              brightness: 100%
+              white: 0%
+              red: 100%
+              blue: 0%
+              green: 0%
+              duration: 150ms
+            - state: False
+              duration: 100ms
+
+            - state: True
+              brightness: 100%
+              white: 0%
+              red: 0%
+              blue: 100%
+              green: 0%
+              duration: 150ms
+            - state: False
+              duration: 100ms
+
+            - state: True
+              brightness: 100%
+              white: 0%
+              red: 0%
+              blue: 100%
+              green: 0%
+              duration: 150ms
+            - state: False
+              duration: 100ms
+            
+            - state: True
+              brightness: 100%
+              white: 0%
+              red: 0%
+              blue: 0%
+              green: 100%
+              duration: 150ms
+            - state: False
+              duration: 100ms
+              
+            - state: True
+              brightness: 100%
+              white: 0%
+              red: 0%
+              blue: 0%
+              green: 100%
+              duration: 150ms
+            - state: False
+              duration: 100ms
+      # Fade effect
+      - random:
+          name: "Fade"
+          transition_length: 1s
+          update_interval: 1s
+      # Smooth effect
+      - random:
+          name: "Smooth"
+          transition_length: 4s
+          update_interval: 5s
+
+#-------------------------------------------
+# OUTPUTS
+#-------------------------------------------
+output:
+#-------------------------------------------
+# Led - WW
+#-------------------------------------------
+  - platform: ledc
+    id: white_channel_ww
+    pin: $ww_pin
+
+#-------------------------------------------
+# Led - RGBW
+#-------------------------------------------
+  - platform: ledc
+    #frequency: 100hz
+    id: red_channel
+    pin: ${red_pin}
+  - platform: ledc
+    id: green_channel
+    pin: ${green_pin}
+  - platform: ledc
+    id: blue_channel
+    pin: ${blue_pin}
+  - platform: ledc
+    id: white_channel
+    #frequency: 10khz 
+    pin: ${white_pin}
+
+#-------------------------------------------
+# REMOTE
+#-------------------------------------------
+remote_receiver:
+  pin:
+    number: $ir_receiver_pin
+    inverted: True
+  dump: all
+  
+remote_transmitter:
+  pin: $ir_transmitter_pin
+  # Infrared remotes use a 50% carrier signal
+  carrier_duty_percent: 50%
+
+button:
+  # IR REMOTE PHILIPS RC276 MAGIO BOX
+
+# TV ON/OFF
+  - platform: template
+    name: Samsung TV ON/OFF
+    on_press:
+      - remote_transmitter.transmit_samsung:
+          data: 0xE0E040BF
+          nbits: 32
+          
+# MAGIO ON/OFF
+
+# 1
+  - platform: template
+    name: Magio 1
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [427, -322, 104, -317, 144, -630, 148, -462, 148, -438, 173, -322, 105, -339, 105, -339, 105, -339, 105, -339, 105, -647, 147, -464, 147, -628, 150, -297, 147, -321, 105, -339, 105, -482, 146]
+# 2
+  - platform: template
+    name: Magio 2
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [428, -300, 144, -321, 108, -642, 151, -463, 147, -461, 150, -321, 107, -336, 108, -310, 150, -294, 149, -607, 170, -612, 166, -465, 145, -628, 150, -296, 148, -298, 145, -321, 107, -644, 150]
+# 3
+  - platform: template
+    name: Magio 3
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [475, -235, 167, -325, 103, -645, 149, -462, 153, -444, 162, -321, 107, -336, 107, -316, 149, -290, 150, -602, 174, -609, 171, -462, 147, -653, 109, -313, 146, -295, 149, -320, 108, -785, 175]
+# 4
+  - platform: template
+    name: Magio 4
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [430, -278, 166, -321, 108, -643, 150, -460, 151, -459, 152, -320, 109, -336, 106, -336, 109, -313, 146, -298, 146, -625, 152, -463, 148, -630, 147, -295, 150, -318, 110, -478, 148, -296, 148]
+# 5
+  - platform: template
+    name: Magio 5
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [416, -297, 148, -296, 146, -608, 171, -463, 148, -464, 146, -321, 108, -311, 148, -321, 107, -337, 107, -312, 148, -600, 177, -461, 150, -607, 170, -325, 104, -336, 107, -457, 170, -461, 151]
+# 6
+  - platform: template
+    name: Magio 6
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [401, -297, 148, -321, 107, -643, 150, -461, 150, -463, 150, -318, 107, -337, 107, -340, 105, -335, 108, -631, 162, -628, 150, -464, 147, -627, 150, -299, 144, -320, 108, -480, 148, -626, 151]
+ # 7
+  - platform: template
+    name: Magio 7
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [425, -296, 149, -299, 146, -625, 154, -439, 169, -460, 151, -299, 145, -320, 108, -296, 164, -319, 109, -643, 150, -630, 147, -462, 149, -627, 152, -295, 147, -319, 109, -480, 147, -773, 171]
+# 8
+  - platform: template
+    name: Magio 8
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [429, -322, 105, -339, 107, -644, 149, -462, 149, -462, 148, -321, 107, -339, 105, -314, 146, -274, 170, -320, 112, -640, 149, -487, 108, -644, 151, -296, 146, -298, 146, -614, 163, -319, 108]
+# 9
+  - platform: template
+    name: Magio 9
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [401, -293, 151, -321, 107, -626, 167, -468, 144, -487, 108, -336, 107, -336, 107, -338, 110, -334, 107, -642, 151, -627, 150, -462, 149, -602, 175, -298, 146, -320, 108, -644, 150, -463, 147]
+ # LAST
+  - platform: template
+    name: Magio Last
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [402, -321, 107, -337, 107, -642, 151, -461, 151, -464, 146, -321, 106, -337, 111, -333, 108, -336, 108, -337, 108, -641, 154, -440, 167, -607, 171, -321, 107, -336, 107, -643, 151, -627, 151]
+# MUTE ON/OFF
+  - platform: template
+    name: Samsung Mute
+    on_press:
+      - remote_transmitter.transmit_samsung:
+          data: 0xE0E0F00F
+          nbits: 32
+# INFO
+  - platform: template
+    name: Magio Info
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [483, -226, 168, -321, 106, -671, 107, -504, 107, -480, 147, -296, 148, -321, 105, -339, 107, -315, 144, -626, 151, -605, 173, -487, 107, -644, 150, -320, 107, -337, 107, -811, 151, -793, 151]
+# VOLUME UP
+  - platform: template
+    name: Samsung Volume Up
+    on_press:
+      - remote_transmitter.transmit_samsung:
+          data: 0xE0E0E01F
+          nbits: 32
+# VOLUME DOWN
+  - platform: template
+    name: Samsung Volume Down
+    on_press:
+      - remote_transmitter.transmit_samsung:
+          data: 0xE0E0D02F
+          nbits: 32
+# UP
+  - platform: template
+    name: Magio Up
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [419, -296, 149, -320, 109, -641, 151, -439, 172, -441, 170, -320, 108, -335, 109, -335, 112, -332, 109, -335, 108, -644, 149, -460, 151, -625, 152, -440, 171, -486, 109, -642, 151, -320, 109]
+# DOWN
+  - platform: template
+    name: Magio Down
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [477, -224, 219, -226, 217, -558, 220, -396, 214, -437, 155, -265, 200, -244, 197, -271, 155, -288, 154, -245, 219, -547, 232, -378, 234, -550, 231, -430, 154, -457, 153, -625, 154, -433, 200]
+# LEFT
+  - platform: template
+    name: Magio Left
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [463, -268, 156, -262, 201, -548, 229, -385, 226, -436, 156, -263, 189, -259, 194, -272, 154, -266, 198, -563, 217, -554, 223, -408, 197, -559, 222, -386, 226, -382, 227, -552, 227, -546, 231]
+# RIGHT
+  - platform: template
+    name: Magio Right
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [483, -212, 155, -290, 157, -619, 156, -457, 154, -456, 155, -290, 154, -289, 154, -292, 152, -291, 153, -290, 153, -623, 155, -456, 155, -622, 155, -455, 156, -464, 148, -623, 154, -789, 156]
+# OK
+  - platform: template
+    name: Magio OK
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [401, -295, 150, -278, 166, -608, 170, -461, 149, -460, 151, -296, 148, -273, 143, -347, 109, -336, 107, -643, 150, -626, 155, -458, 149, -605, 171, -445, 167, -448, 163, -766, 178, -320, 109]
+# CHANNAL UP
+  - platform: template
+    name: Magio Channal Up
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [421, -296, 146, -323, 103, -647, 149, -462, 149, -438, 172, -323, 104, -339, 104, -340, 104, -339, 104, -626, 170, -628, 149, -463, 147, -630, 148, -298, 146, -605, 172, -271, 173, -322, 104]
+# CHANNAL DOWN
+  - platform: template
+    name: Magio Channal Down
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [429, -299, 143, -324, 103, -648, 147, -464, 148, -462, 148, -323, 104, -339, 105, -340, 104, -316, 144, -608, 170, -616, 161, -463, 148, -629, 149, -322, 104, -645, 150, -296, 147, -489, 105]
+# BACK 
+  - platform: template
+    name: Magio Back
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [474, -252, 149, -298, 145, -625, 154, -458, 152, -458, 152, -320, 110, -334, 108, -310, 150, -319, 110, -334, 109, -641, 152, -460, 151, -625, 152, -625, 152, -294, 150, -320, 109, -783, 176]
+ # MENU
+  - platform: template
+    name: Magio Menu
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [421, -297, 148, -321, 108, -642, 150, -460, 155, -437, 170, -320, 109, -335, 108, -310, 150, -296, 148, -319, 110, -643, 148, -464, 147, -626, 152, -462, 148, -459, 152, -462, 149, -297, 147]
+# EPG
+  - platform: template
+    name: Magio EPG
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [429, -295, 150, -320, 108, -642, 151, -464, 147, -442, 169, -320, 109, -311, 147, -296, 148, -295, 149, -626, 152, -624, 153, -462, 149, -627, 150, -774, 170, -320, 109, -808, 152, -296, 147]
+# RED
+  - platform: template
+    name: Magio Red
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [476, -218, 171, -323, 103, -649, 146, -489, 105, -506, 105, -315, 146, -322, 103, -341, 105, -338, 105, -339, 105, -621, 173, -489, 105, -648, 146, -465, 146, -629, 153, -793, 147, -448, 163]
+# GREEN
+  - platform: template
+    name: Magio Green
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [401, -297, 147, -321, 108, -615, 178, -462, 149, -486, 109, -314, 149, -293, 147, -320, 109, -335, 109, -624, 168, -626, 152, -459, 151, -604, 174, -460, 151, -597, 179, -763, 183, -597, 180]
+# YELLOW
+  - platform: template
+    name: Magio Yellow
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [434, -275, 167, -324, 150, -600, 148, -467, 144, -462, 149, -298, 146, -322, 105, -339, 149, -249, 167, -603, 175, -605, 172, -489, 105, -647, 147, -466, 145, -629, 148, -796, 149, -796, 149]
+# BLUE
+  - platform: template
+    name: Magio Blue
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [420, -296, 149, -297, 148, -599, 178, -460, 150, -460, 151, -297, 147, -295, 149, -295, 149, -319, 110, -334, 109, -621, 175, -455, 154, -624, 152, -463, 147, -769, 177, -319, 108, -335, 111]
+# BACKWARD
+  - platform: template
+    name: Magio Backward
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [476, -249, 149, -321, 111, -642, 147, -465, 146, -461, 150, -321, 108, -335, 107, -337, 108, -336, 108, -335, 109, -645, 147, -464, 148, -626, 151, -297, 148, -602, 174, -602, 174, -463, 149]
+# PLAY/PAUSE
+  - platform: template
+    name: Magio Play/Pause
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [402, -321, 107, -313, 148, -626, 150, -444, 167, -463, 148, -321, 107, -337, 107, -337, 108, -335, 108, -642, 151, -628, 149, -463, 148, -627, 151, -294, 150, -769, 174, -321, 111, -780, 177]
+# FORWARD
+  - platform: template
+    name: Magio Forward
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [421, -296, 147, -322, 105, -644, 150, -463, 149, -487, 106, -339, 105, -340, 104, -313, 148, -321, 106, -646, 148, -629, 148, -467, 144, -629, 149, -299, 144, -612, 169, -601, 172, -322, 106]
+# RECORD
+  - platform: template
+    name: Magio Record
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [422, -297, 145, -281, 164, -608, 170, -491, 103, -482, 145, -322, 106, -315, 144, -323, 106, -337, 106, -315, 146, -606, 171, -441, 170, -605, 172, -322, 106, -792, 170, -464, 146, -794, 150]
+# STOP
+  - platform: template
+    name: Magio Stop
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [427, -300, 143, -323, 105, -644, 150, -443, 168, -447, 163, -322, 106, -338, 105, -299, 162, -322, 106, -628, 169, -625, 154, -458, 148, -628, 149, -321, 107, -809, 151, -321, 106, -464, 163]
+# REC TV
+  - platform: template
+    name: Magio Rec
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [400, -296, 153, -292, 148, -626, 151, -445, 166, -463, 147, -299, 149, -269, 171, -321, 107, -340, 104, -336, 109, -622, 170, -462, 149, -627, 151, -299, 145, -793, 151, -461, 150, -771, 173]
+# MUSIC
+  - platform: template
+    name: Magio Music
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [427, -289, 152, -321, 107, -643, 150, -464, 147, -463, 147, -321, 107, -315, 144, -322, 108, -335, 108, -644, 149, -625, 152, -460, 151, -608, 169, -463, 149, -320, 107, -809, 151, -627, 151]
+# MOSAIC
+  - platform: template
+    name: Magio Mosaic
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [447, -250, 147, -300, 144, -629, 149, -489, 110, -500, 106, -315, 146, -298, 145, -322, 106, -337, 107, -313, 147, -602, 175, -463, 149, -602, 174, -488, 107, -645, 149, -794, 150, -795, 150]
+# PIP
+  - platform: template
+    name: Magio Pip
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [401, -298, 146, -301, 143, -627, 151, -462, 148, -464, 147, -321, 107, -313, 146, -303, 143, -318, 107, -337, 107, -642, 150, -444, 166, -629, 150, -442, 169, -767, 177, -320, 106, -314, 194]
+# TXT
+  - platform: template
+    name: Magio TXT
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [434, -320, 109, -312, 148, -606, 171, -459, 152, -448, 162, -320, 109, -335, 108, -313, 147, -319, 109, -641, 152, -611, 166, -464, 147, -626, 151, -297, 146, -793, 151, -774, 172, -294, 149]
+# ARCHIVE
+  - platform: template
+    name: Magio Archive
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [400, -295, 149, -301, 143, -616, 161, -488, 107, -481, 146, -321, 108, -335, 108, -337, 108, -335, 108, -641, 152, -628, 149, -460, 151, -601, 176, -765, 181, -767, 176, -323, 104, -337, 108]
+# MAGIO
+  - platform: template
+    name: Magio Magio
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38kHz
+          code: [430, -295, 150, -298, 145, -654, 106, -480, 149, -438, 172, -320, 107, -338, 107, -336, 106, -314, 151, -290, 150, -626, 151, -463, 148, -625, 155, -458, 151, -625, 151, -793, 154, -458, 150]
+
+# SAMSUNG AA59-00484A
+# SOURCE 
+  - platform: template
+    name: Samsung Source
+    on_press:
+      - remote_transmitter.transmit_samsung:
+          data: 0xE0E0807F
+          nbits: 32
+
+# UP
+  - platform: template
+    name: Samsung Up
+    on_press:
+      - remote_transmitter.transmit_samsung:
+          data: 0xE0E006F9
+          nbits: 32
+
+# DOWN
+  - platform: template
+    name: Samsung Down
+    on_press:
+      - remote_transmitter.transmit_samsung:
+          data: 0xE0E08679
+          nbits: 32
+
+# ENTER
+  - platform: template
+    name: Samsung Enter
+    on_press:
+      - remote_transmitter.transmit_samsung:
+          data: 0xE0E016E9
+          nbits: 32
